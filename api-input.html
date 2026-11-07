@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f5f5f7;font:13px "Segoe UI","Microsoft YaHei",sans-serif}
+input{box-sizing:border-box;width:100%;height:100%;border:1px solid #d5d9e0;border-radius:12px;padding:8px 12px;background:#fff;color:#1d1d1f;outline:none;font:inherit;transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:#0071e3;box-shadow:inset 0 0 0 1px #0071e3}
+@media(prefers-reduced-motion:reduce){input{transition:none}}
+</style></head><body><input id="value" type="text" aria-label="API设置文本输入" autocomplete="off" autocapitalize="off" spellcheck="false">
+<script>
+function setup(component){
+ const field=document.getElementById('value');
+ function render(){const value=typeof component.Data==='string'?component.Data:'';if(field.value!==value)field.value=value;}
+ render();field.addEventListener('input',function(){component.Data=field.value;});
+ component.addEventListener('DataChanged',render);
+}
+</script></body></html>

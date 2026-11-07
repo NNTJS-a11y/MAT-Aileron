@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MAT Aileron</title>
+<style>
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;background:#f5f5f7;color:#1d1d1f}
+.stage{position:absolute;inset:0;isolation:isolate;background:radial-gradient(ellipse at 50% 48%,#fff 0%,#fafbfe 46%,#f1f4f9 100%)}
+.ambient{position:absolute;width:520px;height:240px;left:50%;top:54%;margin:-120px 0 0 -260px;border-radius:50%;background:radial-gradient(ellipse,#c7e5ff80,transparent 70%);filter:blur(18px);opacity:0;opacity:1;animation:words 1.4s ease both}
+.hairline{position:absolute;left:12%;right:12%;top:65%;height:1px;background:linear-gradient(90deg,transparent,#b9cce12b,transparent);opacity:0;opacity:1;animation:words 1.4s ease both}
+.scene{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding-bottom:15px;opacity:1;transition:opacity .55s ease,transform .55s ease}
+.mark{position:relative;display:grid;place-items:center;width:96px;height:96px;overflow:hidden;border-radius:29px;background:linear-gradient(145deg,#3298ff 0%,#0874e7 57%,#075ac2 100%);box-shadow:0 16px 40px #1677ce22,inset 0 1px 1px #ffffff70;opacity:0;animation:arrive 1.1s cubic-bezier(.2,.8,.2,1) .15s forwards}
+.mark svg{position:relative;width:70px;height:70px;z-index:1}.mark:after{content:"";position:absolute;inset:-70%;background:linear-gradient(100deg,transparent 37%,#ffffff12 43%,#ffffff77 50%,#ffffff10 57%,transparent 63%);transform:translateX(-110%) rotate(-12deg);animation:sweep 2.2s cubic-bezier(.2,.6,.2,1) .8s both}
+h1{margin:27px 0 0;font-size:34px;font-weight:600;letter-spacing:-1.2px;line-height:1.2;opacity:0;animation:words .95s ease .6s forwards}
+.tagline{margin:10px 0 0;font-size:15px;font-weight:400;letter-spacing:.8px;color:#69727e;opacity:0;animation:words 1s ease .88s forwards}
+.track{position:relative;width:158px;height:2px;overflow:hidden;background:#dce7f1;border-radius:10px;margin-top:29px;opacity:0;animation:words .6s ease 1.1s forwards}.track span{display:block;width:100%;height:100%;background:linear-gradient(90deg,#b5dcff,#2986e7,#8ac9ff);border-radius:inherit;transform:scaleX(0);transform-origin:left;transform:translateX(-100%);animation:loading 1.6s ease-in-out infinite}
+.caption{margin-top:13px;height:18px;color:#8993a0;font-size:11px;letter-spacing:1px;opacity:0;animation:words .7s ease 1.3s forwards}
+.stage.done .scene{opacity:0;transform:translateY(-5px)}.stage.done .ambient,.stage.done .hairline{opacity:0;transition:opacity .55s ease}.stage.ready .track span{animation:none;transform:scaleX(1)}
+@keyframes loading{0%{transform:translateX(-105%)}100%{transform:translateX(105%)}}
+@keyframes arrive{from{opacity:0;transform:translateY(14px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes words{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@keyframes sweep{from{transform:translateX(-100%) rotate(-12deg)}to{transform:translateX(100%) rotate(-12deg)}}
+@keyframes fill{0%{transform:scaleX(0)}65%{transform:scaleX(.76)}100%{transform:scaleX(1)}}
+@keyframes ambient{0%{opacity:0;transform:translateY(18px) scale(.8)}25%,75%{opacity:1;transform:none}100%{opacity:0;transform:scale(1.06)}}
+@keyframes exit{0%,79%{opacity:1}100%{opacity:0;transform:translateY(-5px)}}
+@media(max-height:360px){.mark{width:72px;height:72px;border-radius:23px}.mark svg{width:54px;height:54px}h1{margin-top:18px;font-size:28px}.track{margin-top:20px}}
+@media(prefers-reduced-motion:reduce){.mark,h1,.tagline,.track,.caption{opacity:1;animation:none;transform:none}.scene,.ambient{animation:none}.scene{transition:none}.stage.done .scene{transform:none}.mark:after{display:none}.track span{animation:none;transform:scaleX(.3)}.stage.ready .track span{transform:scaleX(1)}}
+</style></head><body>
+<main class="stage" aria-label="MAT Aileron 正在启动"><div class="ambient"></div><div class="hairline"></div><section class="scene">
+<div class="mark"><svg viewBox="0 0 40 40" fill="none" aria-hidden="true"><path d="M17 33V24h-5a7 7 0 0 1-7-7v-4a3 3 0 0 1 6 0v4a1 1 0 0 0 1 1h5V8a4 4 0 0 1 8 0v15h3a1 1 0 0 0 1-1v-8a3 3 0 0 1 6 0v8a7 7 0 0 1-7 7h-3v4a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2Z" fill="white"/></svg></div>
+<h1>MAT Aileron</h1><p class="tagline">Steer Your Laboratory</p><div class="track" aria-hidden="true"><span></span></div><div class="caption" id="caption">正在打开工作区…</div>
+</section></main>
+<script>
+function setup(component){
+ const stage=document.querySelector('.stage');
+ function render(){
+  const data=component.Data;if(!data)return;
+  if(data.ready===true){stage.classList.add('ready');document.getElementById('caption').textContent='工作区已就绪';}
+  if(data.fade===true)stage.classList.add('done');
+ }
+ // Report a painted, fully revealed brand; MATLAB owns the minimum hold.
+ setTimeout(function(){requestAnimationFrame(function(){requestAnimationFrame(function(){component.Data={action:'painted'};});});},2000);
+ document.addEventListener('keydown',function(event){if(event.key==='Escape')component.Data={action:'skip'};});
+ component.addEventListener('DataChanged',render);render();
+}
+</script></body></html>

@@ -1,0 +1,7 @@
+启动动画原生停留修正
+
+主窗口在动画完整显示至少3秒并淡出前保持隐藏，避免提前遮挡。
+最短停留由MATLAB端控制，旧网页提前完成回调不能绕过。
+动画使用新的StartupPresentation类和startup-animation-native.html。
+手动Aileron启动、Esc跳过和仅注册命令的MATLAB启动方式保持不变。
+更新后关闭当前助手再试，完整重启MATLAB可清除旧类缓存。
