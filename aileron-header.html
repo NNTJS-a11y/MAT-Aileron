@@ -11,7 +11,7 @@ button:disabled{opacity:.45;cursor:default}button:disabled:hover{background:#fff
 function setup(component){
  const release=document.getElementById('release');
  const api=document.getElementById('api');
- function render(){const data=component.Data;if(data&&typeof data==='object'){if(typeof data.release==='string')release.textContent=data.release+'  /  MATLAB WORKSPACE';api.disabled=!!data.generating;}}
+ function render(){const data=component.Data;if(data&&typeof data==='object'){if(typeof data.release==='string')release.textContent=data.release+'  /  MATLAB WORKSPACE';api.lastChild.textContent=data.language==='en'?'API Settings':'API设置';api.setAttribute('aria-label',data.language==='en'?'API Settings':'API设置');api.disabled=!!data.generating;}}
  render();component.addEventListener('DataChanged',render);
  api.addEventListener('click',function(){component.Data={action:'apiSettings',nonce:Date.now()};});
 }

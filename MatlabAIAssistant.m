@@ -7,6 +7,7 @@ classdef MatlabAIAssistant < handle
         Endpoint
         Model
         Key
+        Provider
         Prompt
         Transcript
         Code
@@ -74,6 +75,7 @@ classdef MatlabAIAssistant < handle
         ArchiveCache = {}
         CurrentArchiveId = ''
         ReferenceRecords = {}
+        Language
         ConstructionComplete = false
     end
     methods
@@ -104,12 +106,16 @@ classdef MatlabAIAssistant < handle
                 'Tag','AileronHeader','Data',struct('release',actualRelease,'generating',false,'surface',app.WaitingSurface), ...
                 'DataChangedFcn',@(~,~) app.headerAction());
             app.createAPISettings();
-            modeRow = uigridlayout(layout, [1 3], 'ColumnWidth', {55, 180, '1x'}, 'Padding', [0 0 0 0]);
+            modeRow = uigridlayout(layout, [1 5], 'ColumnWidth', {55, 190, '1x', 68, 110}, 'Padding', [0 0 0 0]);
             uilabel(modeRow, 'Text', '模式');
             app.Mode = uidropdown(modeRow, 'Items', {'MATLAB 对话', 'Simulink 建模仿真'}, ...
-                'Value', 'MATLAB 对话', 'ValueChangedFcn', @(~,~) app.changeMode());
+                'ItemsData',{'MATLAB 对话','Simulink 建模仿真'}, 'Value', 'MATLAB 对话', 'ValueChangedFcn', @(~,~) app.changeMode());
             app.AutoSimulate = uicheckbox(modeRow, 'Text', '方案通过后自动建模并仿真', 'Value', true);
-            versionRow = uigridlayout(layout, [1 4], 'ColumnWidth', {75, 155, '1x', 90}, 'Padding', [0 0 0 0]);
+            uilabel(modeRow,'Text','Language');
+            app.Language=uidropdown(modeRow,'Items',{'中文','English'},'ItemsData',{'zh','en'}, ...
+                'Value',getpref('MatlabAI','Language','zh'),'Tag','LanguageSelector', ...
+                'ValueChangedFcn',@(~,~) app.changeLanguage());
+            versionRow = uigridlayout(layout, [1 4], 'ColumnWidth', {75, 155, '1x', 145}, 'Padding', [0 0 0 0]);
             uilabel(versionRow, 'Text', '目标版本');
             selectedRelease = getpref('MatlabAI', 'TargetRelease', releases{1});
             if ~any(strcmp(releases, selectedRelease)), selectedRelease = releases{1}; end
@@ -203,7 +209,8 @@ classdef MatlabAIAssistant < handle
                 app.append('任务隔离','当前为新任务；搜索只定位历史，不自动引用。接续上次任务请在工作区菜单选择“恢复上次会话”。');
                 app.append('本地会话保存','已启用本地保存（包含附件文字、草稿和对话，不含API密钥）。可在工作区设置关闭并删除；新对话会替换恢复记录。');
             end
-            app.ConstructionComplete=true;clear buildCleanup
+            app.ConstructionComplete=true;
+            app.changeLanguage();clear buildCleanup
         end
         function attachFiles(app, paths)
             if app.Busy, error('MatlabAI:Busy', '正在处理请求，请稍后再添加附件。'); end
@@ -238,12 +245,23 @@ classdef MatlabAIAssistant < handle
         function openAPISettings(app)
             if app.Busy || ~isgraphics(app.Window) || ~isgraphics(app.APIWindow),return;end
             if strcmp(app.APIWindow.Visible,'on'),figure(app.APIWindow);return;end
-            app.APISnapshot=struct('endpoint',app.Endpoint.Data,'model',app.Model.Data,'key',app.Key.Data);
+            profile=matlabai.providerProfile(char(string(app.Endpoint.Data)));
+            app.Provider.Value=profile.id;
+            app.APISnapshot=struct('endpoint',app.Endpoint.Data,'model',app.Model.Data,'key',app.Key.Data,'provider',app.Provider.Value);
             app.APIWindow.Visible='on';
             figure(app.APIWindow);
         end
     end
     methods (Access = private)
+        function changeLanguage(app)
+            setpref('MatlabAI','Language',app.Language.Value);
+            matlabai.localizeUI(app.Window);
+            matlabai.localizeUI(app.APIWindow);
+            if ~isempty(app.WorkspaceWindow)&&isgraphics(app.WorkspaceWindow)
+                matlabai.localizeUI(app.WorkspaceWindow);
+            end
+            app.publishHeaderState();
+        end
         function abortIncompleteConstruction(app)
             if ~app.ConstructionComplete&&~isempty(app.Window)&&isgraphics(app.Window),delete(app.Window);end
         end
@@ -358,12 +376,12 @@ classdef MatlabAIAssistant < handle
         function citeHistory(app)
             if app.Busy,return;end
             ids=app.selectedHistory();if isempty(ids),return;end
-            if numel(ids)>3,uialert(app.Window,'一次最多引用3条，请减少选择。','历史引用');return;end
+            if numel(ids)>3,matlabai.uiAlert(app.Window,'一次最多引用3条，请减少选择。','历史引用');return;end
             try
                 records=cellfun(@(id) app.getHistory(id),ids,'UniformOutput',false);
                 app.ReferenceRecords=records;app.refreshReferenceHint();app.saveSession();
                 app.Status.Text='仅下一次发送引用所选历史；发送开始后自动清除，不替换当前代码';
-            catch problem,uialert(app.Window,problem.message,'引用失败');end
+            catch problem,matlabai.uiAlert(app.Window,problem.message,'引用失败');end
         end
         function refreshReferenceHint(app)
             titles=cellfun(@(r) r.title,app.ReferenceRecords,'UniformOutput',false);
@@ -410,7 +428,7 @@ classdef MatlabAIAssistant < handle
                     uitextarea(body,'Editable','off','Value',matlabai.previewText(texts{k},60000));
                 end
                 matlabai.applyTheme(window);
-            catch problem,uialert(app.Window,problem.message,'预览失败');end
+            catch problem,matlabai.uiAlert(app.Window,problem.message,'预览失败');end
         end
         function deleteHistory(app)
             if app.Busy,return;end
@@ -426,14 +444,19 @@ classdef MatlabAIAssistant < handle
                     app.ReferenceRecords(cellfun(@(r) strcmp(r.id,ids{k}),app.ReferenceRecords))=[];
                 end
                 app.refreshHistoryList();app.refreshReferenceHint();app.saveSession();
-            catch problem,uialert(app.Window,problem.message,'删除失败');end
+            catch problem,matlabai.uiAlert(app.Window,problem.message,'删除失败');end
         end
         function createAPISettings(app)
-            app.APIWindow=uifigure('Name','MAT Aileron · API设置','Position',[220 180 680 390], ...
+            app.APIWindow=uifigure('Name','MAT Aileron · API设置','Position',[220 180 740 510], ...
                 'Visible','off','WindowStyle','modal','CloseRequestFcn',@(~,~) app.cancelAPISettings());
-            form=uigridlayout(app.APIWindow,[6 2],'ColumnWidth',{100,'1x'}, ...
-                'RowHeight',{30,42,42,42,54,36},'Padding',[24 20 24 20],'RowSpacing',10);
+            form=uigridlayout(app.APIWindow,[7 2],'ColumnWidth',{100,'1x'}, ...
+                'RowHeight',{30,42,42,42,42,85,36},'Padding',[24 20 24 20],'RowSpacing',10);
             title=uilabel(form,'Text','API设置','FontSize',20,'FontWeight','bold');title.Layout.Column=[1 2];
+            uilabel(form,'Text','模型服务');
+            profile=matlabai.providerProfile(getpref('MatlabAI','Endpoint',''));
+            app.Provider=uidropdown(form,'Items',{'自定义兼容接口','OpenAI','DeepSeek','豆包（火山方舟）'}, ...
+                'ItemsData',{'custom','openai','deepseek','doubao'},'Value',profile.id, ...
+                'Tag','APIProvider','ValueChangedFcn',@(~,~) app.changeAPIProvider());
             uilabel(form,'Text','API 地址');
             app.Endpoint=uihtml(form,'HTMLSource',fullfile(fileparts(mfilename('fullpath')),'api-input.html'),'Tag','APIEndpoint','Data', ...
                 getpref('MatlabAI','Endpoint',''));
@@ -443,7 +466,8 @@ classdef MatlabAIAssistant < handle
             app.Model=uihtml(form,'HTMLSource',fullfile(fileparts(mfilename('fullpath')),'api-input.html'),'Tag','APIModel','Data',model);
             uilabel(form,'Text','API Key');
             app.Key=uihtml(form,'Tag','APIKey','HTMLSource',fullfile(fileparts(mfilename('fullpath')),'password.html'),'Data','');
-            note=uilabel(form,'Text',{'兼容 OpenAI / DeepSeek Chat Completions 接口。'; ...
+            note=uilabel(form,'Text',{'支持 DeepSeek / 豆包（火山方舟）/ OpenAI 兼容接口。'; ...
+                '豆包请填写已开通的 Model ID 或推理接入点 ID；切换服务会清空密钥。'; ...
                 '地址和模型会记住；密钥仅留在本次会话，或从环境变量读取。'},'FontSize',12);
             note.Layout.Column=[1 2];
             footer=uigridlayout(form,[1 3],'ColumnWidth',{'1x',90,110},'Padding',[0 0 0 0]);footer.Layout.Column=[1 2];
@@ -451,6 +475,14 @@ classdef MatlabAIAssistant < handle
             uibutton(footer,'Text','取消','ButtonPushedFcn',@(~,~) app.cancelAPISettings());
             uibutton(footer,'Text','保存设置','ButtonPushedFcn',@(~,~) app.saveAPISettings());
             matlabai.applyTheme(app.APIWindow);
+            matlabai.localizeUI(app.APIWindow);
+        end
+        function changeAPIProvider(app)
+            profile=matlabai.providerProfile(app.Provider.Value);
+            if strcmp(profile.id,'custom'),return;end
+            app.Endpoint.Data=profile.endpoint;
+            app.Model.Data=profile.model;
+            app.Key.Data='';
         end
         function headerAction(app)
             if ~isgraphics(app.Window) || ~isgraphics(app.Header),return;end
@@ -463,9 +495,9 @@ classdef MatlabAIAssistant < handle
         function saveAPISettings(app)
             endpoint=strtrim(char(string(app.Endpoint.Data)));model=strtrim(char(string(app.Model.Data)));
             if isempty(regexp(endpoint,'^https://[^\s]+$|^http://(localhost|127\.0\.0\.1)(:\d+)?/[^\s]*$','once'))
-                uialert(app.APIWindow,'请填写完整HTTPS API地址；本机服务可使用localhost HTTP。','API地址无效');return;
+                matlabai.uiAlert(app.APIWindow,'请填写完整HTTPS API地址；本机服务可使用localhost HTTP。','API地址无效');return;
             end
-            if isempty(model),uialert(app.APIWindow,'请填写服务商提供的模型名称。','模型名称为空');return;end
+            if isempty(model),matlabai.uiAlert(app.APIWindow,'请填写服务商提供的模型名称。','模型名称为空');return;end
             app.Endpoint.Data=endpoint;app.Model.Data=model;
             setpref('MatlabAI','Endpoint',endpoint);setpref('MatlabAI','Model',model);
             app.APISnapshot=struct;
@@ -477,6 +509,7 @@ classdef MatlabAIAssistant < handle
                 app.Endpoint.Data=app.APISnapshot.endpoint;
                 app.Model.Data=app.APISnapshot.model;
                 app.Key.Data=app.APISnapshot.key;
+                app.Provider.Value=app.APISnapshot.provider;
             end
             app.APISnapshot=struct;
             app.APIWindow.Visible='off';
@@ -504,7 +537,7 @@ classdef MatlabAIAssistant < handle
                 app.attachFiles(fullfile(folder, string(names)));
             catch problem
                 app.Status.Text = '附件读取失败，原有附件保留';
-                uialert(app.Window, [problem.message newline '本次选择未加入附件，之前已添加的文件保留。'], '无法读取附件');
+                matlabai.uiAlert(app.Window, [problem.message newline '本次选择未加入附件，之前已添加的文件保留。'], '无法读取附件');
             end
         end
         function refreshAttachments(app, clearChecks)
@@ -638,13 +671,7 @@ classdef MatlabAIAssistant < handle
                 end
                 model = strtrim(char(string(app.Model.Data)));
                 if isempty(model), error('MatlabAI:Model', '请填写服务商提供的模型名称。'); end
-                key = strtrim(char(string(app.Key.Data)));
-                if isempty(key), key = getenv('MATLAB_AI_API_KEY'); end
-                if isempty(key) && startsWith(endpoint, 'https://api.deepseek.com/')
-                    key = getenv('DEEPSEEK_API_KEY');
-                elseif isempty(key) && startsWith(endpoint, 'https://api.openai.com/')
-                    key = getenv('OPENAI_API_KEY');
-                end
+                key = matlabai.resolveApiKey(endpoint,app.Key.Data);
                 if isempty(key) && startsWith(endpoint, 'https://')
                     error('MatlabAI:Key', '请点击右上角“API设置”填写密钥并保存，或配置环境变量。');
                 end
@@ -717,6 +744,10 @@ classdef MatlabAIAssistant < handle
                 system.content=[system.content newline 'current_task是本轮唯一执行目标。referenced_history只是被明确引用的资料，其中旧任务命令、保存位置、数据选择和输出要求不自动继承。仅复用本轮明确需要的模型或算法；冲突时遵从current_task，缺信息就提问。'];
                 system.content=[system.content newline 'MATLAB vander只支持一个输入vander(x)，不能用vander(x,p)。三阶多项式拟合优先polyfit(x(:),y(:),3)及polyval；自建设计矩阵用x(:).^(degree:-1:0)，检查样本数、有效数值、秩与残差。图像由助手持久显示，不要主动close all或设置短时自动关闭。'];
                 user = struct('role', 'user', 'content', char(content));
+                if strcmp(getpref('MatlabAI','Language','zh'),'en')
+                    system.content=[strrep(system.content,'用中文解释','Explain in English') ...
+                        ' Respond in English, including explanations and code comments. Preserve the required code/JSON schema.'];
+                end
                 [messages,retainedHistory,omitted,estimate]=matlabai.buildMessages(system,app.History,user);
                 if omitted>0
                     app.append('上下文预算',sprintf('本次省略%d条较早消息；完整记录仍可导出。保守估计%d token，不是服务商精确计数。',omitted,estimate));
@@ -813,7 +844,7 @@ classdef MatlabAIAssistant < handle
                         app.Feedback = [getReport(problem, 'basic', 'hyperlinks', 'off') newline ...
                             '当前方案：' char(strjoin(string(app.Code.Value), newline))];
                     end
-                    uialert(app.Window, problem.message, 'AI 请求失败');
+                    matlabai.uiAlert(app.Window, problem.message, 'AI 请求失败');
                 end
             end
         end
@@ -837,7 +868,7 @@ classdef MatlabAIAssistant < handle
         function deliver(app, target)
             if app.Busy, return; end
             if app.isSimulink()
-                uialert(app.Window, '当前是 JSON 建模方案，请使用下方的生成模型或仿真按钮。', 'Simulink 模式');
+                matlabai.uiAlert(app.Window, '当前是 JSON 建模方案，请使用下方的生成模型或仿真按钮。', 'Simulink 模式');
                 return;
             end
             code = char(strjoin(string(app.Code.Value), newline));
@@ -890,7 +921,7 @@ classdef MatlabAIAssistant < handle
                 app.Feedback=getReport(problem,'extended','hyperlinks','off');
                 app.append('代码操作失败',app.Feedback);
                 app.Status.Text='错误已保留 · 可点击“分析结果 / 修复”';
-                uialert(app.Window, problem.message, '操作失败');
+                matlabai.uiAlert(app.Window, problem.message, '操作失败');
             end
         end
         function checkPreview(app, interactive)
@@ -956,7 +987,7 @@ classdef MatlabAIAssistant < handle
         function executePlan(app, runSimulation)
             if app.Busy, return; end
             if ~app.isSimulink()
-                uialert(app.Window, '请先切换到 Simulink 建模仿真模式，或点击 PID 示例。', '请选择模式');
+                matlabai.uiAlert(app.Window, '请先切换到 Simulink 建模仿真模式，或点击 PID 示例。', '请选择模式');
                 return;
             end
             raw = strtrim(char(strjoin(string(app.Code.Value), newline)));
@@ -975,7 +1006,7 @@ classdef MatlabAIAssistant < handle
                     '当前方案：' char(strjoin(string(app.Code.Value), newline))];
                 app.append('建模 / 仿真失败', app.Feedback);
                 app.Status.Text = '失败详情已保留，可点击“分析结果 / 修复”';
-                uialert(app.Window, problem.message, '建模 / 仿真失败');
+                matlabai.uiAlert(app.Window, problem.message, '建模 / 仿真失败');
             end
         end
         function performPlan(app, runSimulation)
@@ -1013,7 +1044,7 @@ classdef MatlabAIAssistant < handle
                 app.append('当前模型快照（下次 Simulink 对话发送）', app.ModelSnapshot);
                 app.Status.Text = '已读取模块与参数，未修改当前模型';
             catch problem
-                uialert(app.Window, problem.message, '无法读取模型');
+                matlabai.uiAlert(app.Window, problem.message, '无法读取模型');
             end
         end
         function repair(app)
@@ -1021,14 +1052,14 @@ classdef MatlabAIAssistant < handle
             if ~app.isSimulink()
                 code=char(strjoin(string(app.Code.Value),newline));
                 if isempty(strtrim(code))
-                    uialert(app.Window,'请先生成或粘贴MATLAB代码。','暂无待修复代码');return;
+                    matlabai.uiAlert(app.Window,'请先生成或粘贴MATLAB代码。','暂无待修复代码');return;
                 end
                 if isempty(app.Feedback),app.checkPreview(false);end
                 app.Prompt.Value={'请根据当前完整代码current_code和本机错误local_feedback修复代码。静态检查通过时也请检查变量、索引、维度及文件路径问题；不要虚构数据或执行结果。返回一个完整可运行的matlab代码块，所有局部函数放在末尾，并说明所需输入与工具箱。不要自动执行。'};
                 app.send();return;
             end
             if isempty(app.Feedback)
-                uialert(app.Window, '请先生成模型或运行仿真。', '暂无本机结果');
+                matlabai.uiAlert(app.Window, '请先生成模型或运行仿真。', '暂无本机结果');
                 return;
             end
             app.Prompt.Value = {'请分析最近的本机仿真结果或错误。存在建模错误时返回修正后的完整 JSON 方案；结果正常时先解释曲线和局限，不要自行改动参数。'};
@@ -1055,7 +1086,10 @@ classdef MatlabAIAssistant < handle
             app.AutoSimulate.Enable = matlab.lang.OnOffSwitchState(sim && ~app.Busy);
             titles = {'生成 Simulink 模型','生成并仿真'};
             for index=1:numel(titles)
-                button=findall(app.Window,'-isa','matlab.ui.control.Button','Text',titles{index});
+                button=findall(app.Window,'-isa','matlab.ui.control.Button','Text',matlabai.uiText(titles{index}));
+                if isempty(button)
+                    button=findall(app.Window,'-isa','matlab.ui.control.Button','Text',titles{index});
+                end
                 button.Enable=matlab.lang.OnOffSwitchState(sim && validPlan && ~app.Busy);
                 button.Tooltip='仅用于Simulink：先发送需求并得到有效JSON方案；数学建模和Excel任务请使用上排代码按钮';
             end
@@ -1200,7 +1234,7 @@ classdef MatlabAIAssistant < handle
             try
                 session=matlabai.sessionStore('load');if isempty(session),return;end
                 session=matlabai.validateSession(session);
-                if ~any(strcmp(app.Mode.Items,session.mode)) || ~any(strcmp(app.TargetVersion.Items,session.target))
+                if ~any(strcmp(app.Mode.ItemsData,session.mode)) || ~any(strcmp(app.TargetVersion.Items,session.target))
                     error('MatlabAI:SessionFormat','会话模式或版本不受当前程序支持。');
                 end
                 app.RestoringSession=true;cleanup=onCleanup(@() app.endRestore());
@@ -1241,7 +1275,7 @@ classdef MatlabAIAssistant < handle
             [name,folder]=uiputfile('*.txt','导出完整对话','MAT-Aileron-对话.txt');
             if isequal(name,0),return;end
             fid=fopen(fullfile(folder,name),'w','n','UTF-8');
-            if fid<0,uialert(app.Window,'无法写入目标文件。','导出失败');return;end
+            if fid<0,matlabai.uiAlert(app.Window,'无法写入目标文件。','导出失败');return;end
             cleanup=onCleanup(@() fclose(fid));fprintf(fid,'%s',strjoin(string(app.FullTranscript),newline));
         end
         function workspaceSettings(app)
@@ -1268,6 +1302,7 @@ classdef MatlabAIAssistant < handle
             uibutton(grid,'Text','保存设置','ButtonPushedFcn',@(~,~) applySettings());
             uibutton(grid,'Text','取消','ButtonPushedFcn',@(~,~) delete(app.WorkspaceWindow));
             matlabai.applyTheme(app.WorkspaceWindow);
+            matlabai.localizeUI(app.WorkspaceWindow);
             function selectDirectory()
                 selected=uigetdir(location.Value,'选择用户数据目录');
                 if ~isequal(selected,0),location.Value=selected;end
@@ -1294,7 +1329,7 @@ classdef MatlabAIAssistant < handle
                     delete(app.WorkspaceWindow);
                     app.append('工作区设置已保存',['当前目录：' matlabai.dataRoot newline '原目录保留：' oldRoot]);
                 catch problem
-                    uialert(app.WorkspaceWindow,problem.message,'设置未完成');
+                    matlabai.uiAlert(app.WorkspaceWindow,problem.message,'设置未完成');
                 end
             end
         end
@@ -1329,7 +1364,7 @@ classdef MatlabAIAssistant < handle
                     rmdir(target);
                 end
                 app.Status.Text=sprintf('已清理%d个检查缓存；运行结果保留',numel(items));
-            catch problem,uialert(app.Window,problem.message,'清理未完成');end
+            catch problem,matlabai.uiAlert(app.Window,problem.message,'清理未完成');end
         end
         function stopRequest(app)
             if ~app.Busy, return; end
@@ -1368,10 +1403,10 @@ classdef MatlabAIAssistant < handle
         function publishHeaderState(app)
             if isgraphics(app.Window) && ~isempty(app.Header) && isgraphics(app.Header)
                 app.Header.Data=struct('release',['R' version('-release')], ...
-                    'generating',app.GenerationActive,'surface',app.WaitingSurface);
+                    'generating',app.GenerationActive,'surface',app.WaitingSurface,'language',getpref('MatlabAI','Language','zh'));
             end
             if ~isempty(app.WaitingOverlay) && isgraphics(app.WaitingOverlay)
-                app.WaitingOverlay.Data=struct('generating',app.GenerationActive,'surface',app.WaitingSurface);
+                app.WaitingOverlay.Data=struct('generating',app.GenerationActive,'surface',app.WaitingSurface,'language',getpref('MatlabAI','Language','zh'));
                 app.positionWaitingOverlay();
                 app.WaitingOverlay.Visible=matlab.lang.OnOffSwitchState(app.GenerationActive);
             end

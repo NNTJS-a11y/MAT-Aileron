@@ -1,6 +1,6 @@
 # MAT Aileron | Steer Your Laboratory
 
-MATLAB 内运行的独立助手窗口，支持兼容 Chat Completions 的服务、流式多轮对话、文档附件、代码预览、方法摘要与基础 Simulink 建模。不是 MathWorks 官方产品。当前实机验证环境为 R2024a。
+本包为 v0.3.1 独立助手版。MATLAB 内运行的独立助手窗口，支持兼容 Chat Completions 的服务、流式多轮对话、文档附件、代码预览、方法摘要与基础 Simulink 建模。不是 MathWorks 官方产品。当前实机验证环境为 R2024a。
 
 ## 安装与更新
 
@@ -10,7 +10,9 @@ MATLAB 内运行的独立助手窗口，支持兼容 Chat Completions 的服务�
 
 ## API 与隐私
 
-右上角“API设置”配置完整 API 地址、服务商模型名称及该服务的 API Key。地址和模型保存在当前电脑的 MATLAB preferences；密钥仅保留在窗口内存，也可读取 MATLAB_AI_API_KEY、DEEPSEEK_API_KEY 或 OPENAI_API_KEY 环境变量。取消设置撤销修改。ChatGPT 订阅与第三方 API 由各服务单独提供。
+v0.3.1 在“API设置”新增模型服务选择：DeepSeek、豆包（火山方舟）、OpenAI、自定义兼容接口。预设会填写官方地址；豆包模型由用户填写账号已开通的 Model ID 或推理接入点 ID。切换到预设服务会清空密钥，取消可恢复原设置。详见 [模型服务接入说明](模型服务接入说明.md)。
+
+右上角“API设置”配置完整 API 地址、服务商模型名称及该服务的 API Key。地址和模型保存在当前电脑的 MATLAB preferences；密钥仅保留在窗口内存，也可读取 MATLAB_AI_API_KEY、DEEPSEEK_API_KEY、ARK_API_KEY 或 OPENAI_API_KEY 环境变量。取消设置撤销修改。ChatGPT 订阅与第三方 API 由各服务单独提供。
 
 发送会将当前需求、保留的上下文、附件提取文字和主动勾选的编辑器脚本发给配置的服务。不要把密钥写进代码或打包文件。界面的密钥字段不会写入恢复记录；用户主动在聊天中输入的文字会随对话保存。模型服务可能依据自己的政策保留请求。
 

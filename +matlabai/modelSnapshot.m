@@ -1,6 +1,6 @@
-function text = modelSnapshot
+function text = modelSnapshot(model)
 if isempty(ver('simulink')), error('MatlabAI:Simulink', '没有安装 Simulink。'); end
-model = bdroot;
+if nargin<1,model=bdroot;else,model=bdroot(model);end
 if isempty(model) || isequal(model, 0) || strcmp(get_param(model, 'BlockDiagramType'), 'library')
     error('MatlabAI:Model', '请先打开一个 Simulink 模型。');
 end

@@ -43,3 +43,9 @@ Aileron
 最短停留由MATLAB端计时，不接受网页提前结束；启动动画采用新的StartupPresentation实现及
 startup-animation-native.html，避免旧动画类/页面缓存。按Esc或关闭浮层仍可主动跳过。
 更新后先关闭当前助手再输入Aileron；完整退出MATLAB重开可确保所有旧类缓存释放。
+
+## v0.2.0 — 中文 / English
+
+Use the Language selector next to Mode to choose 中文 or English. The selection is remembered locally. Switching preserves your task, code and attachments. New AI replies follow the selected language. Existing conversations and native MATLAB diagnostics retain their original text. Configure your own API endpoint, model and key in API Settings. Tested on Windows with MATLAB R2024a; other releases have not been tested individually.
+
+在模式行的 Language 下拉框选择中文或 English，选择会在本机记住。切换保留任务、代码与附件，新生成的解释跟随所选语言。已有聊天和 MATLAB 原生诊断保留原文。请自行配置 API 地址、模型及密钥。已在 Windows + MATLAB R2024a 实测。

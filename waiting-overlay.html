@@ -8,7 +8,7 @@ canvas{width:280px;max-width:88%;height:190px;flex-shrink:1;min-height:60px}.lab
 function setup(component){
  const stop=document.getElementById('stop');
  const animation=createAileronWaitingAnimation(document.getElementById('surface'),document.getElementById('waiting'),{disabled:false});
- function render(){const data=component.Data;if(data&&typeof data==='object')animation.update(data);}
+ function render(){const data=component.Data;if(data&&typeof data==='object'){animation.update(data);document.querySelector('.label').textContent=data.language==='en'?'Generating…':'等待结果';stop.textContent=data.language==='en'?'Stop':'停止生成';}}
  render();component.addEventListener('DataChanged',render);
  stop.addEventListener('click',function(){component.Data={action:'stopGeneration',nonce:Date.now()};});
 }
